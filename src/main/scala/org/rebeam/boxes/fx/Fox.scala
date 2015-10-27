@@ -42,29 +42,10 @@ object Fox {
   )
 
   def bind[T](b: BoxM[T], f: Property[T]) = new FoxBindingGeneric(b, f): FoxBinding  
-
-  // def bind(b: BoxM[Boolean], f: BooleanProperty) = new FoxBindingBoolean(b, f): FoxBinding
-  // def bind(b: BoxM[Int], f: IntegerProperty) = new FoxBindingInteger(b, f): FoxBinding
-  // def bind(b: BoxM[Long], f: LongProperty) = new FoxBindingLong(b, f): FoxBinding
-  // def bind(b: BoxM[Float], f: FloatProperty) = new FoxBindingFloat(b, f): FoxBinding
-  // def bind(b: BoxM[Double], f: DoubleProperty) = new FoxBindingDouble(b, f): FoxBinding
   
-  // def bindBox[T, P <: Property[_ <: T]](b: Box[T], f: P) = new FoxBoxBindingGeneric[T, P](b, f): FoxBinding
-  // def bindFX[T, P <: Property[_ >: T]](b: Box[T], f: P) = new FoxFXBindingGeneric[T, P](b, f): FoxBinding
+  def bindBox[T, P <: Property[_ <: T]](b: BoxM[T], f: P) = new FoxFXToBoxBindingGeneric[T, P](b, f): FoxBinding
+  def bindFX[T, PT >: T, P <: Property[PT]](b: BoxR[T], f: P) = new FoxBoxToFXBindingGeneric[T, PT, P](b, f): FoxBinding
 }
-
-// private class FoxBoxBindingGeneric[T, P <: Property[_ <: T]](val b: Box[T], val f: P) extends ChangeListener[T] with FoxBinding {
-//   f.addListener(this)  
-//   def changed(observable: ObservableValue[_ <: T], oldValue: T, newValue: T) = shelf.transact(implicit txn => b() = newValue)
-// }
-
-// private class FoxFXBindingGeneric[T, P <: Property[_ >: T]](val b: Box[T], val f: P) extends FoxBinding {
-//   val view = Fox.view(implicit txn => {
-//     //Always read b, to ensure we view it
-//     val bv = b()
-//     if (f.getValue() != bv) f.setValue(bv)
-//   })
-// }
 
 trait FoxBinding
 
@@ -76,7 +57,7 @@ trait FoxBinding
  * the observer will not be GCed as long as this binding is retained (by the Property it is listening to)
  */
 
-private class FoxBindingGeneric[T, P <: Property[T]](val b: BoxM[T], val f: P) extends ChangeListener[T] with FoxBinding{
+private class FoxBindingGeneric[T, P <: Property[T]](val b: BoxM[T], val f: P) extends ChangeListener[T] with FoxBinding {
   
   //We don't need any synchronisation on ourRevision or setting vars, since 
   //changed() and the Fox.view are always called from the JavaFX thread.
@@ -88,7 +69,13 @@ private class FoxBindingGeneric[T, P <: Property[T]](val b: BoxM[T], val f: P) e
 
   f.addListener(this)
   
-  def changed(observable: ObservableValue[_ <: T], oldValue: T, newValue: T) = if (!setting) ourRevision = Some(atomicToRevision(b() = newValue).index)
+  def changed(observable: ObservableValue[_ <: T], oldValue: T, newValue: T) = {
+    // println("FX |==| Box, FX change, setting " + setting + ", newValue " + newValue)
+    if (!setting) {
+      ourRevision = Some(atomicToRevision(b() = newValue).index)
+      // println("FX |==| Box, FX change, applied " + newValue + " as revision " + ourRevision)
+    }
+  }
   
   val observer = Fox.observer{
     for {
@@ -97,12 +84,17 @@ private class FoxBindingGeneric[T, P <: Property[T]](val b: BoxM[T], val f: P) e
     } yield (bv, ri)
   }{ 
     case (bv, ri) => {
+      // println("FX |==| Box, Box observation " + bv + ", in revision " + ri)   
       val moreRecent = ourRevision.map(_ < ri).getOrElse(true)
       if (moreRecent) {
+        // println("FX |==| Box, Box has new new value " + bv + ", about to set FX")   
         setting = true
         if (f.getValue() != bv) f.setValue(bv)
         setting = false
         ourRevision = Some(ri)
+        // println("FX |==| Box, Box new value " + bv + " has been used")   
+      } else {
+        // println("FX |==| Box, Box new value " + bv + " ignored, we already have same or more recent version")   
       }
     }
   }
@@ -111,149 +103,29 @@ private class FoxBindingGeneric[T, P <: Property[T]](val b: BoxM[T], val f: P) e
 
 }
 
-// //TODO de-duplicate specialised versions below - tricky to do, I think due to Scala/Java wrapper mismatches in parametric types
+//Unidirectional versions
 
-// private class FoxBindingBoolean(val b: Box[Boolean], val f: BooleanProperty) extends ChangeListener[java.lang.Boolean] with FoxBinding {
-//   //We don't need any synchronisation on ourRevision or setting vars, since 
-//   //changed() and the Fox.view are always called from the JavaFX thread.
-//   var ourRevision: Option[Long] = None
-//   var setting = false
+private class FoxFXToBoxBindingGeneric[T, P <: Property[_ <: T]](val b: BoxM[T], val f: P) extends ChangeListener[T] with FoxBinding {
+  f.addListener(this)  
+  def changed(observable: ObservableValue[_ <: T], oldValue: T, newValue: T) = {
+    // println("FX -> Box newValue " + newValue)
+    atomic { b() = newValue }
+  }
+}
 
-//   f.addListener(this)
-  
-//   def changed(observable: ObservableValue[_ <: java.lang.Boolean], oldValue: java.lang.Boolean, newValue: java.lang.Boolean) = if (!setting) {
-//     val newRevision = shelf.transactToRevision(implicit txn => b() = newValue)._2.index
-//     ourRevision = Some(newRevision)
-//   }
-  
-//   val view = Fox.view(implicit txn => {
-//     //Always read b, to ensure we view it
-//     val bv = b()
-//     val moreRecent = ourRevision.map(_ < txn.revision.index).getOrElse(true)
+private class FoxBoxToFXBindingGeneric[T, PT >: T, P <: Property[PT]](val b: BoxR[T], val f: P) extends ChangeListener[PT] with FoxBinding {
 
-//     //Update if we have a more recent revision - i.e. if we have committed no revisions, or this txn's revision is more recent than
-//     //the most recent we have committed.
-//     if (moreRecent) {
-//       setting = true
-//       if (f.getValue() != b()) f.setValue(bv)
-//       setting = false
-//       ourRevision = Some(txn.revision.index)
-//     }
-//   })
-// }
+  //We listen to the property so it will retain us, but do nothing with the updates
+  //This is also the cause of the interesting parametric types!
+  f.addListener(this)
+  def changed(observable: ObservableValue[_ <: PT], oldValue: PT, newValue: PT) = {}
 
-// private class FoxBindingInteger(val b: Box[Int], val f: IntegerProperty) extends ChangeListener[Number] with FoxBinding {
-//   //We don't need any synchronisation on ourRevision or setting vars, since 
-//   //changed() and the Fox.view are always called from the JavaFX thread.
-//   var ourRevision: Option[Long] = None
-//   var setting = false
+  val observer = Fox.observer(b){ 
+    bv => {
+      // println("Box -> FX newValue " + bv)
+      if (f.getValue() != bv) f.setValue(bv) 
+    }
+  }
+  atomic { observe(observer) }  
 
-//   f.addListener(this)
-
-//   def changed(observable: ObservableValue[_ <: Number], oldValue: Number, newValue: Number) = if (!setting) {
-//     val newRevision = shelf.transactToRevision(implicit txn => b() = newValue.intValue())._2.index
-//     ourRevision = Some(newRevision)
-//   }
-  
-//   val view = Fox.view(implicit txn => {
-//     //Always read b, to ensure we view it
-//     val bv = b()
-//     val moreRecent = ourRevision.map(_ < txn.revision.index).getOrElse(true)
-
-//     //Update if we have a more recent revision - i.e. if we have committed no revisions, or this txn's revision is more recent than
-//     //the most recent we have committed.
-//     if (moreRecent) {
-//       setting = true
-//       if (f.getValue() != b()) f.setValue(bv)
-//       setting = false
-//       ourRevision = Some(txn.revision.index)
-//     }
-//   })
-// }
-
-// private class FoxBindingLong(val b: Box[Long], val f: LongProperty) extends ChangeListener[Number] with FoxBinding {
-//   //We don't need any synchronisation on ourRevision or setting vars, since 
-//   //changed() and the Fox.view are always called from the JavaFX thread.
-//   var ourRevision: Option[Long] = None
-//   var setting = false
-
-//   f.addListener(this)
-
-//   def changed(observable: ObservableValue[_ <: Number], oldValue: Number, newValue: Number) = if (!setting) {
-//     val newRevision = shelf.transactToRevision(implicit txn => b() = newValue.longValue())._2.index
-//     ourRevision = Some(newRevision)
-//   }
-  
-//   val view = Fox.view(implicit txn => {
-//     //Always read b, to ensure we view it
-//     val bv = b()
-//     val moreRecent = ourRevision.map(_ < txn.revision.index).getOrElse(true)
-
-//     //Update if we have a more recent revision - i.e. if we have committed no revisions, or this txn's revision is more recent than
-//     //the most recent we have committed.
-//     if (moreRecent) {
-//       setting = true
-//       if (f.getValue() != b()) f.setValue(bv)
-//       setting = false
-//       ourRevision = Some(txn.revision.index)
-//     }
-//   })
-// }
-
-// private class FoxBindingFloat(val b: Box[Float], val f: FloatProperty) extends ChangeListener[Number] with FoxBinding {
-//   //We don't need any synchronisation on ourRevision or setting vars, since 
-//   //changed() and the Fox.view are always called from the JavaFX thread.
-//   var ourRevision: Option[Long] = None
-//   var setting = false
-
-//   f.addListener(this)
-
-//   def changed(observable: ObservableValue[_ <: Number], oldValue: Number, newValue: Number) = if (!setting) {
-//     val newRevision = shelf.transactToRevision(implicit txn => b() = newValue.floatValue())._2.index
-//     ourRevision = Some(newRevision)
-//   }
-  
-//   val view = Fox.view(implicit txn => {
-//     //Always read b, to ensure we view it
-//     val bv = b()
-//     val moreRecent = ourRevision.map(_ < txn.revision.index).getOrElse(true)
-
-//     //Update if we have a more recent revision - i.e. if we have committed no revisions, or this txn's revision is more recent than
-//     //the most recent we have committed.
-//     if (moreRecent) {
-//       setting = true
-//       if (f.getValue() != b()) f.setValue(bv)
-//       setting = false
-//       ourRevision = Some(txn.revision.index)
-//     }
-//   })
-// }
-
-// private class FoxBindingDouble(val b: Box[Double], val f: DoubleProperty) extends ChangeListener[Number] with FoxBinding {
-//   //We don't need any synchronisation on ourRevision or setting vars, since 
-//   //changed() and the Fox.view are always called from the JavaFX thread.
-//   var ourRevision: Option[Long] = None
-//   var setting = false
-
-//   f.addListener(this)
-
-//   def changed(observable: ObservableValue[_ <: Number], oldValue: Number, newValue: Number) = if (!setting) {
-//     val newRevision = shelf.transactToRevision(implicit txn => b() = newValue.doubleValue())._2.index
-//     ourRevision = Some(newRevision)
-//   }
-  
-//   val view = Fox.view(implicit txn => {
-//     //Always read b, to ensure we view it
-//     val bv = b()
-//     val moreRecent = ourRevision.map(_ < txn.revision.index).getOrElse(true)
-
-//     //Update if we have a more recent revision - i.e. if we have committed no revisions, or this txn's revision is more recent than
-//     //the most recent we have committed.
-//     if (moreRecent) {
-//       setting = true
-//       if (f.getValue() != b()) f.setValue(bv)
-//       setting = false
-//       ourRevision = Some(txn.revision.index)
-//     }
-//   })
-// }
+}

@@ -28,8 +28,9 @@ object Includes {
     def |==|  (b: BoxM[T]) = Fox.bind(b, f)
     def |==|  (b: Box[T]) = Fox.bind(b.m, f)
 
-    // def |== [S <: T] (b: BoxM[S]) = Fox.bindFX(b, f)
-    // def ==| [S >: T] (b: Box<[S]) = Fox.bindBox(b, f)
+    def |== [S <: T] (b: BoxR[S]) = Fox.bindFX[S, T, Property[T]](b, f)
+    def ==| [S >: T] (b: BoxM[S]) = Fox.bindBox(b, f)
+
   }
 
   implicit class FoxBindableBooleanProperty(val f: Property[java.lang.Boolean]) {

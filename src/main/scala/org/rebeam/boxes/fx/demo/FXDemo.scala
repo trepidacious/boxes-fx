@@ -75,11 +75,9 @@ object FXDemo extends JFXApp {
   }
   check2.selectedProperty |==| b
 
-
-  // TODO need one-way binding
-  // val bString = b().map(b => if (b "selected" else "not selected"))
-  // val bLabel = new Label
-  // bLabel.textProperty |== bString
+  val bString = b().map(b => if (b) "selected" else "not selected")
+  val bLabel = new Label
+  bLabel.textProperty |== bString
   
   val grid = new GridPane {
     padding = Insets(10)
@@ -87,29 +85,27 @@ object FXDemo extends JFXApp {
     vgap = 5
   }
 
-  val c = atomic { create(Color.ALICEBLUE) }
+  val c = atomic { create(Color.BLACK) }
   
   val cp = new ColorPicker
   cp.valueProperty |==| c
   
-  //TODO need one-way binding
-  // val cLabel = new Label
-  // val cs = BoxNow.calc(implicit txn => c().toString())
-  // cLabel.textProperty |==| cs
+  val cLabel = new Label
+  val cs = c().map(_.toString)
+  cLabel.textProperty |== cs
 
-  //TODO need one-way binding  
-  // val swatch = new Label("COLOR!")
-  // swatch.textFillProperty |== c
+  val swatch = new Label("COLOR!")
+  swatch.textFillProperty |== c
   
   grid.add(text, 0, 0)
   grid.add(text2, 0, 1)
   grid.add(label, 0, 2)
   grid.add(check, 0, 3)
   grid.add(check2, 0, 4)
-  // grid.add(bLabel, 0, 5)
+  grid.add(bLabel, 0, 5)
   grid.add(cp, 0, 6)
-  // grid.add(cLabel, 0, 7)
-  // grid.add(swatch, 0, 8)
+  grid.add(cLabel, 0, 7)
+  grid.add(swatch, 0, 8)
 
   stage = new PrimaryStage {
     title = "CheckBox Test"
