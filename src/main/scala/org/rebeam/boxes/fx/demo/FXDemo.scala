@@ -22,36 +22,6 @@ import BoxScriptImports._
 
 object FXDemo extends JFXApp {
 
-//  
-//  
-//  val check = new CheckBox {
-//    text = "CheckBox"
-//  }
-//  
-//  check.onAction = (event: ActionEvent) => {
-//      lblCheckState.text = if (check.indeterminate.get) "Indeterminate" else check.selected.get().toString
-//  }
-//
-//  val lblCheckState = new Label {
-//    text = check.selected.get().toString
-//  }
-//
-//  val btnAllowIndeterminate = new scalafx.scene.control.Button {
-//    text = "Allow Indeterminate"
-//  }
-//  btnAllowIndeterminate.onAction = (event: ActionEvent) => {
-//      check.allowIndeterminate = !check.allowIndeterminate.get()
-//  }
-//
-//  val lblAllowIndeterminate = new Label {
-//    text <== when(check.allowIndeterminate) choose "Can be Indeterminate" otherwise "Can not be Indeterminate"
-//  }
-//
-//  val btnFire = new Button {
-//    text = "Fire!"
-//  }
-//  btnFire.onAction = (event: ActionEvent) =>  check.fire()
-
   val s = atomic { create("Hi!") }
   
   val text = new TextField
