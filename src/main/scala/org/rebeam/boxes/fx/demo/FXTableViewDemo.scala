@@ -50,7 +50,6 @@ object FXTableViewDemo extends JFXApp {
   firstNameCol.setCellFactory(TextFieldTableCell.forTableColumn());
 
   val lastNameCol = new TableColumn[Person, String]("Last Name")
-
   lastNameCol.setCellValueFactory(new PropertyValueFactory("lastName"))
   lastNameCol.setCellFactory(TextFieldTableCell.forTableColumn());
 
