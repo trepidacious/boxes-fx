@@ -20,9 +20,8 @@ import javafx.scene.control.TableCell
 import javafx.scene.control.cell.TextFieldTableCell
 import javafx.util.StringConverter
 import javafx.beans.property._
+import javafx.beans.value._
 import javafx.scene.control.cell._
-
-// class PropertyMap(map: Map[String, Property])
 
 class Person {
   lazy val firstNameProperty = new SimpleStringProperty(this, "firstName")
@@ -42,6 +41,7 @@ object Person {
 object FXTableViewDemo extends JFXApp {
 
   val persons = FXCollections.observableArrayList(Person("bob", "bathyscape"), Person("alice", "angstrom"))
+
 
   val tableView = new TableView(persons)
 
