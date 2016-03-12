@@ -1,4 +1,4 @@
-package boxes.transact.fx.demo
+package org.rebeam.boxes.fx.demo
 
 import scalafx.Includes._
 import scalafx.application.JFXApp

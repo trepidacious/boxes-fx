@@ -1,6 +1,7 @@
 package org.rebeam.boxes.fx
 
 import javafx.beans.property.Property
+import javafx.beans.value.ObservableValue
 import scala.language.implicitConversions
 import javafx.beans.property._
 
@@ -82,5 +83,24 @@ object Includes {
     def |==| (b: Box[Double]) = Fox.bind(convert(b.m), f)
     def |==| (b: BoxM[Double]) = Fox.bind(convert(b), f)
   }
+
+  implicit class FoxBindableDoubleObservableValue(val f: ObservableValue[java.lang.Double]) {
+    def convert(bs: BoxM[Double]): BoxM[java.lang.Double] = BoxM(
+      bs.read.map(b => new java.lang.Double(b)), 
+      b => bs.write(b)
+    )
+
+    def ==| (b: Box[Double]) = Fox.bindBox(convert(b.m), f)
+  }
+
+  implicit class FoxBindableDoubleNumberObservableValue(val f: ObservableValue[java.lang.Number]) {
+    def convert(bs: BoxM[Double]): BoxM[java.lang.Number] = BoxM(
+      bs.read.map(b => new java.lang.Double(b)), 
+      b => bs.write(b.doubleValue())
+    )
+
+    def ==| (b: Box[Double]) = Fox.bindBox(convert(b.m), f)
+  }
+
 
 }
